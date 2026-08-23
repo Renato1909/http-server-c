@@ -33,20 +33,21 @@ function Wait-ServerUp {
 function Req([string[]]$CurlArgs) {
     $bodyFile = New-TemporaryFile
     $w = '%{http_code}|%{content_type}|%{size_download}'
-    $out = & curl.exe -s -o $bodyFile.FullName -w $w @CurlArgs
-    $meta = [string]($out | Select-Object -Last 1)
-    $parts = $meta.Split('|')
-    if ($parts.Count -lt 3) { $parts = @('0', '', '0') }
+    $raw = & curl.exe -s -o $bodyFile.FullName -w $w @CurlArgs
+    $meta = [string[]]@($raw) | Where-Object { $_ -match '^\d+\|' } | Select-Object -Last 1
+    $m = [regex]::Match([string]$meta, '^(\d+)\|([^|]*)\|(\d+)')
     $result = [pscustomobject]@{
         Status      = 0
         ContentType = ''
         Size        = [long]0
         Body        = ''
     }
-    [void][int]::TryParse($parts[0], [ref]$result.Status)
-    $result.ContentType = $parts[1]
-    [void][long]::TryParse($parts[2], [ref]$result.Size)
-    $result.Body = (Get-Content $bodyFile.FullName -Raw -ErrorAction SilentlyContinue)
+    if ($m.Success) {
+        $result.Status = [int]$m.Groups[1].Value
+        $result.ContentType = $m.Groups[2].Value
+        $result.Size = [long]$m.Groups[3].Value
+    }
+    $result.Body = Get-Content $bodyFile.FullName -Raw -ErrorAction SilentlyContinue
     Remove-Item $bodyFile.FullName -Force -ErrorAction SilentlyContinue
     return $result
 }
@@ -105,8 +106,9 @@ try {
     $r = Req @('--path-as-is', "$base/%2e%2e/Makefile")
     Assert ($r.Status -eq 404) 'path traversal encodado bloqueado' "status=$($r.Status)"
 
-    $codes = (& curl.exe -s -o NUL -w '%{http_code} ' "$base/" "$base/style.css") -join ''
-    Assert ($codes -match '200\s+200') 'keep-alive reusa a conexao' "codes=$codes"
+    $codes = [string](& curl.exe -s -o NUL -o NUL -w '%{http_code} ' "$base/" "$base/style.css")
+    $allCodes = @([regex]::Matches($codes, '\d{3}') | ForEach-Object { $_.Value })
+    Assert (($allCodes.Count -ge 2) -and -not ($allCodes | Where-Object { $_ -ne '200' })) 'keep-alive reusa a conexao' "codes=$codes"
 
     $r = Req @('--http1.0', "$base/")
     Assert ($r.Status -eq 200) 'HTTP/1.0 aceito' "status=$($r.Status)"
