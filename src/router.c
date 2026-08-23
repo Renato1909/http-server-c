@@ -106,6 +106,13 @@ int router_dispatch(SOCKET sock, http_request_t *req, int *keep_alive)
     int is_get = strcmp(req->method, "GET") == 0;
     int is_head = req->head_only;
 
+    if (strcmp(req->version, "HTTP/1.0") != 0 &&
+        strcmp(req->version, "HTTP/1.1") != 0) {
+        *keep_alive = 0;
+        send_error(sock, 505, 0, *keep_alive, NULL);
+        return 505;
+    }
+
     if (!is_get && !is_head) {
         *keep_alive = 0;
         send_error(sock, 405, 0, *keep_alive, "Allow: GET, HEAD\r\n");
