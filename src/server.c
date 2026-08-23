@@ -7,6 +7,7 @@
 #include "server.h"
 #include "conn.h"
 #include "log.h"
+#include "router.h"
 
 static volatile SOCKET g_listener = INVALID_SOCKET;
 
@@ -42,6 +43,8 @@ int server_run(int port)
     }
 
     SetConsoleCtrlHandler(ctrl_handler, TRUE);
+
+    router_init();
 
     SOCKET listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (listener == INVALID_SOCKET) {

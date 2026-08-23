@@ -4,28 +4,11 @@
 #include "conn.h"
 #include "log.h"
 #include "request.h"
+#include "response.h"
+#include "router.h"
 
 #define RECV_BUF_SIZE 16384
 #define KEEPALIVE_MAX_REQUESTS 100
-
-static int send_all(SOCKET sock, const char *data, int len)
-{
-    int sent = 0;
-    while (sent < len) {
-        int n = send(sock, data + sent, len - sent, 0);
-        if (n <= 0)
-            return 0;
-        sent += n;
-    }
-    return 1;
-}
-
-static int send_simple(SOCKET sock, const char *status_line)
-{
-    const char *resp = "Content-Length: 0\r\nConnection: close\r\n\r\n";
-    return send_all(sock, status_line, (int)strlen(status_line)) &&
-           send_all(sock, resp, (int)strlen(resp));
-}
 
 void handle_connection(SOCKET sock)
 {
@@ -47,33 +30,32 @@ void handle_connection(SOCKET sock)
         }
 
         if (st == REQ_TOO_LARGE) {
-            send_simple(sock, "HTTP/1.1 431 Request Header Fields Too Large\r\n");
+            response_send(sock, 431, "text/plain; charset=utf-8", NULL, 0,
+                          0, 0, NULL);
             return;
         }
         if (st != REQ_OK) {
-            send_simple(sock, "HTTP/1.1 400 Bad Request\r\n");
+            response_send(sock, 400, "text/plain; charset=utf-8", NULL, 0,
+                          0, 0, NULL);
             return;
         }
 
-        log_info("%s %s %s", req.method, req.target, req.version);
+        int keep_alive = req.keep_alive;
+        int status = router_dispatch(sock, &req, &keep_alive);
 
-        const char *body = "hello from c-http-server\n";
-        char hdr[512];
-        int hl = snprintf(hdr, sizeof(hdr),
-                          "HTTP/1.1 200 OK\r\n"
-                          "Content-Type: text/plain; charset=utf-8\r\n"
-                          "Content-Length: %zu\r\n"
-                          "Connection: %s\r\n"
-                          "\r\n",
-                          strlen(body),
-                          req.keep_alive ? "keep-alive" : "close");
-        if (!send_all(sock, hdr, hl))
-            return;
-        if (!req.head_only && !send_all(sock, body, (int)strlen(body)))
-            return;
+        char ip[48] = "-";
+        SOCKADDR_IN peer;
+        int peer_len = sizeof(peer);
+        if (getpeername(sock, (SOCKADDR *)&peer, &peer_len) == 0) {
+            DWORD iplen = sizeof(ip);
+            if (WSAAddressToStringA((SOCKADDR *)&peer, sizeof(peer), NULL,
+                                    ip, &iplen) != 0)
+                strcpy(ip, "-");
+        }
+        log_info("%s %s -> %d [%s]", req.method, req.target, status, ip);
 
         served++;
-        if (!req.keep_alive || served >= KEEPALIVE_MAX_REQUESTS)
+        if (!keep_alive || served >= KEEPALIVE_MAX_REQUESTS)
             return;
 
         size_t leftover = have - consumed;

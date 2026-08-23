@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>c-http-server — Servidor HTTP em C puro</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="card">
+    <header>
+      <span id="status-dot" title="status do servidor"></span>
+      <h1>c-http-server</h1>
+      <p class="subtitle">Servidor HTTP/1.1 escrito em C puro sobre Winsock</p>
+    </header>
+
+    <section>
+      <h2>Sobre este projeto</h2>
+      <p>
+        Nenhuma biblioteca externa: sockets, parser de requisições,
+        roteamento e respostas implementados à mão para estudar o
+        protocolo HTTP e programação de rede no Windows.
+      </p>
+    </section>
+
+    <section>
+      <h2>Endpoints</h2>
+      <table>
+        <thead>
+          <tr><th>Método</th><th>Rota</th><th>Descrição</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>GET</code></td><td><code>/health</code></td><td>Health check (retorna "ok")</td></tr>
+          <tr><td><code>GET</code></td><td><code>/style.css</code></td><td>Este estilo</td></tr>
+          <tr><td><code>GET</code></td><td><code>/app.js</code></td><td>JS que verifica o /health</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer>
+      Feito em C · <span id="health-text">verificando /health…</span>
+    </footer>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
