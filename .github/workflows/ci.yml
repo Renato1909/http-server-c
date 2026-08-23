@@ -1,0 +1,20 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compilar
+        shell: cmd
+        run: mingw32-make
+
+      - name: Testes de integracao
+        shell: pwsh
+        run: ./tests/run-tests.ps1
